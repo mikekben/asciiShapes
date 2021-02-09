@@ -1,3 +1,7 @@
+-- Haskell library to construct ASCII art
+-- (c) 2020-2021 Benjamin Mikek (see LICENSE for details)
+
+
 {-# LANGUAGE LambdaCase #-}
 import GHC.Num
 
