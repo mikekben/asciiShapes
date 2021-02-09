@@ -181,11 +181,23 @@ figureStrings (Above f s pos) = let (firstLst,secondLst) = forceWidth (f,s) pos
 
 
  -- Example figures --
+
+ -- A snowman with a hat
 snowman :: Figure
 snowman = Above (Above (makeSquare 5) (Rectangle 9 1) AMiddle)  (Above (Circle 4) (Above (Circle 6) (Circle 8) AMiddle) AMiddle) AMiddle
-     
+
+-- A ''dog'' :(
+dog :: Figure
+dog = Beside (FlipV (RightTriangle 2 2)) (Beside (Beside (Above (Rectangle 13 5) (Rectangle 1 4) ALeft) (Rectangle 1 9) BBottom) (Circle 2) BTop) BTop
+
+-- A Sierpinski triangle
+sierpinski :: Natural -> Natural -> Figure
+sierpinski n 1 = CenterTriangle n
+sierpinski n depth = Above (sierpinski n (depth - 1)) (Beside (sierpinski n (depth - 1)) (sierpinski n (depth - 1)) BMiddle) AMiddle
+
+
+
  
- -- (Above (Above (makeSquare 5) (Rectangle 9 1) AMiddle)  (Above (Circle 4) (Above (Circle 6) (Circle 8) AMiddle) AMiddle) AMiddle)
 
 
 
