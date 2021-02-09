@@ -1,5 +1,6 @@
 ASCII Shapes - Ben Mikek
 =========================================
+
 Existing functionality:
   + Basic shapes:
     + Rectangle width height
@@ -19,10 +20,10 @@ Existing functionality:
     + Vertical flip (flipV)
     + Horizontal flip (flipH)
 
-=========================================
+-----------------------------------------
 In progress functionality:
   + Lines
-=========================================
+-----------------------------------------
 Planned functionality:
   + Overlays
   + Outlines
