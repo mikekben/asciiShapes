@@ -52,7 +52,16 @@ data BesidePosition = BTop | BMiddle | BBottom
 data AbovePosition = ALeft | AMiddle | ARight
 
 
-data Figure = Rectangle Natural Natural| RightTriangle Natural Natural | CenterTriangle Natural | Circle Natural | Line Natural Natural | FlipV Figure | FlipH Figure | Beside Figure Figure BesidePosition | Above Figure Figure AbovePosition
+data Figure =   Rectangle Natural Natural           | 
+                RightTriangle Natural Natural       | 
+                CenterTriangle Natural              | 
+                Circle Natural                      |
+                Line Natural Natural                |
+                FlipV Figure                        |
+                FlipH Figure                        |
+                Beside Figure Figure BesidePosition |
+                Above Figure Figure AbovePosition   |
+                CutH Figure Double                  
 
 
 makeSquare :: Natural -> Figure
@@ -70,6 +79,7 @@ isEmpty (FlipV f) = isEmpty f
 isEmpty(FlipH f) = isEmpty f
 isEmpty(Beside f s _) = isEmpty f && isEmpty s
 isEmpty(Above f s _) = isEmpty f && isEmpty s
+isEmpty(CutH f p) = isEmpty f || p == 1
 
 
 
@@ -83,6 +93,7 @@ fillerRow (FlipV fig) = fillerRow fig
 fillerRow (FlipH fig) = fillerRow fig
 fillerRow (Beside f s _) = fillerRow f ++ fillerRow s
 fillerRow (Above f s _) = longer (fillerRow f) (fillerRow s)
+fillerRow (CutH f p) = fillerRow f
 
 
 circleRow :: Natural -> Natural -> String
@@ -175,6 +186,10 @@ figureStrings (Beside f s pos) = let (firstLst,secondLst) = forceHeight (f,s) po
  -- Above --
 figureStrings (Above f s pos) = let (firstLst,secondLst) = forceWidth (f,s) pos
                                 in firstLst ++ secondLst
+ -- Cut --
+figureStrings (CutH f p) =  let base = figureStrings f
+                                todrop = round (p * (fromIntegral (length base)))
+                            in  drop todrop base
 
 
 
@@ -189,6 +204,10 @@ snowman = Above (Above (makeSquare 5) (Rectangle 9 1) AMiddle)  (Above (Circle 4
 -- A ''dog'' :(
 dog :: Figure
 dog = Beside (FlipV (RightTriangle 2 2)) (Beside (Beside (Above (Rectangle 13 5) (Rectangle 1 4) ALeft) (Rectangle 1 9) BBottom) (Circle 2) BTop) BTop
+
+-- A heart
+heart :: Figure
+heart = Above (Beside (FlipV (CutH (Circle 10) 0.51)) (FlipV (CutH (Circle 10) 0.51)) BMiddle) (FlipV (CenterTriangle 38)) AMiddle
 
 -- A Sierpinski triangle
 sierpinski :: Natural -> Natural -> Figure
