@@ -27,6 +27,16 @@ makeList :: Natural -> a -> [a]
 makeList 0 _ = []
 makeList n x = x : makeList (n-1) x
 
+
+
+transpose :: [[a]] -> [[a]]
+transpose ([]:_) = []
+transpose x = (map head x) : transpose (map tail x)
+
+
+
+
+
 iota :: Natural -> [Natural]
 iota 0 = []
 iota n = n : iota (n-1)
@@ -45,6 +55,9 @@ roundOdd n = case (odd (round n),n < (fromIntegral (round n))) of (True,_) -> ro
                                                                   (False,True) -> (round n)-1
                                                                   (False,False) -> (round n)+1
 
+divideRound :: Natural -> Double -> Natural
+divideRound n d = tn (round ((fromIntegral n)/d))
+
 tn :: Int -> Natural
 tn = naturalFromInteger . toInteger
 
@@ -52,11 +65,13 @@ data BesidePosition = BTop | BMiddle | BBottom
 data AbovePosition = ALeft | AMiddle | ARight
 
 
-data Figure =   Rectangle Natural Natural           | 
-                RightTriangle Natural Natural       | 
-                CenterTriangle Natural              | 
+data Figure =   Rectangle Natural Natural           |
+                RightTriangle Natural Natural       |
+                CenterTriangle Natural              |
                 Circle Natural                      |
                 Line Natural Natural                |
+                Text String Natural                 |
+                Invisible Figure                    |
                 FlipV Figure                        |
                 FlipH Figure                        |
                 Beside Figure Figure BesidePosition |
@@ -64,8 +79,16 @@ data Figure =   Rectangle Natural Natural           |
                 CutH Figure Double                  
 
 
+
 makeSquare :: Natural -> Figure
 makeSquare n = Rectangle n n
+
+makeTrapezoid :: Natural -> Natural -> Natural -> Figure
+makeTrapezoid h t b = if (b >= t) then Beside (Beside (FlipH (RightTriangle (divideRound (b-t) 2.0) h)) (Rectangle t h) BMiddle) (RightTriangle (divideRound (b-t) 2.0) h) BMiddle
+                                  else FlipV (makeTrapezoid h b t)
+
+makeParallelogram :: Natural -> Natural -> Natural -> Figure
+makeParallelogram h t b = Beside (Beside (FlipH (RightTriangle (divideRound (b-t) 2.0) h)) (Rectangle t h) BMiddle) (FlipV (RightTriangle (divideRound (b-t) 2.0) h)) BMiddle
 
 
 
@@ -80,6 +103,8 @@ isEmpty(FlipH f) = isEmpty f
 isEmpty(Beside f s _) = isEmpty f && isEmpty s
 isEmpty(Above f s _) = isEmpty f && isEmpty s
 isEmpty(CutH f p) = isEmpty f || p == 1
+isEmpty(Invisible f) = isEmpty f
+isEmpty(Text str _) = str == ""
 
 
 
@@ -88,12 +113,16 @@ fillerRow (Rectangle w h) = makeList w emptyChar
 fillerRow (RightTriangle w h) = makeList w emptyChar
 fillerRow (CenterTriangle n) = makeList n emptyChar
 fillerRow (Circle r) = makeList ((2*r)+1) emptyChar
-fillerRow (Line x y) = makeList (x+1) emptyChar
+fillerRow (Line x y) = makeList x emptyChar
+fillerRow (Invisible f) = fillerRow f
 fillerRow (FlipV fig) = fillerRow fig
 fillerRow (FlipH fig) = fillerRow fig
 fillerRow (Beside f s _) = fillerRow f ++ fillerRow s
 fillerRow (Above f s _) = longer (fillerRow f) (fillerRow s)
 fillerRow (CutH f p) = fillerRow f
+fillerRow (Text str size) = makeList (((tn . length) str) * (divideRound size 2.0)) emptyChar
+
+
 
 
 circleRow :: Natural -> Natural -> String
@@ -150,14 +179,126 @@ forceWidth (f,s) ARight =   let fList = figureStrings f
                                                     else (map (\x -> (makeList (sWidth-fWidth) emptyChar) ++ x) fList,sList)
 
 
-lineRec :: [String] -> Natural -> Natural -> Natural -> [String]
-lineRec soFar used x y =    if (used>=x) then soFar
-                            else    let unmaxed = (round ((fromIntegral x)/(fromIntegral y)))
-                                        run = max unmaxed 1
-                                    in lineRec (soFar++[((makeList used emptyChar)++(makeList run specialChar)++(makeList (x-used-run) emptyChar))]) (used+unmaxed) x y
+
+lineRec :: [String] -> Natural -> Natural -> Natural -> Natural -> [String]
+lineRec soFar used 0 perRow width = soFar
+lineRec soFar used rowsLeft perRow width =  lineRec (soFar ++ [(makeList used emptyChar) ++ (makeList perRow specialChar) ++ (makeList (width - perRow - used) emptyChar)]) (used + perRow) (rowsLeft - 1) perRow width
 
 
+textWidthConstant = 1.5
 
+character :: Char -> Natural -> Figure
+
+character ' ' size =    (Invisible (Rectangle (divideRound size textWidthConstant) size))
+character '!' size =    let width = divideRound size textWidthConstant
+                            ten = max 1 (divideRound size 10.0)
+                            circSize = 1 + (ten * 2)
+                            triSize = divideRound size 2.0
+                            trap = FlipV (makeTrapezoid triSize ten width)
+                            spacer = (Invisible (Rectangle ten (size - triSize - circSize)))
+                            circ = Circle ten
+                        in  (Above (Above trap spacer AMiddle) circ AMiddle)
+
+-- Missing: F, J, M, P, Q, V, W, X, Y, Z
+
+
+character 'A' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            ninetyP = width - fiveP - fiveP
+                        in  (Beside (Above (Beside (Invisible (Rectangle fiveP fiveP)) (Rectangle ninetyP fiveP) BMiddle) (Beside (Rectangle fiveP (size - fiveP)) (Rectangle ninetyP fiveP) BMiddle) ALeft) (Rectangle fiveP (size - fiveP)) BBottom)
+character 'B' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            ninetyP = width - fiveP - fiveP
+                            lhalf = divideRound (size - fiveP - fiveP - fiveP) 2.0
+                            uhalf = size - fiveP - fiveP - fiveP - lhalf
+                            inv = Invisible (Rectangle fiveP fiveP)
+                            beam = (Beside (Rectangle ninetyP fiveP) inv BMiddle)
+                        in  (Beside (Rectangle fiveP size) (Above (Above (Above (Above beam (Rectangle fiveP uhalf) ARight) beam ALeft) (Rectangle fiveP lhalf) ARight) beam ARight) BMiddle)
+character 'C' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            nfp = width - fiveP
+                            beam = (Beside (Invisible (Rectangle fiveP fiveP)) (Rectangle nfp fiveP) BMiddle)
+                        in  (Above (Above  beam (Rectangle fiveP (size-fiveP-fiveP)) ALeft) beam ARight)
+
+
+character 'D' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            twenty = max 1 (divideRound size 4.0)
+                            sixty = size - twenty - twenty
+                            diag = Line twenty twenty
+                            tb = (Rectangle (width - twenty - fiveP) fiveP)
+                        in  (Beside (Rectangle fiveP size)
+                                    (Beside (Above (Above tb (Invisible (Rectangle (width - twenty - fiveP) (size - fiveP - fiveP))) AMiddle) tb AMiddle) 
+                                            (Above (Above diag (Rectangle fiveP sixty) ARight) (FlipH diag) ARight) 
+                                            BMiddle)
+                                    BMiddle)
+character 'E' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            ht = size - fiveP - fiveP
+                        in  (Above (Above (Rectangle width fiveP) (Beside (Rectangle fiveP ht) (Rectangle (width - fiveP) fiveP) BMiddle) ARight) (Rectangle width fiveP) ARight)
+character 'G' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            inv = Invisible (Rectangle fiveP fiveP)
+                            lhalf = divideRound (size - fiveP - fiveP - fiveP) 2.0
+                            uhalf = size - fiveP - fiveP - fiveP - lhalf
+                        in  (Above (Beside inv (Rectangle (width-fiveP) fiveP) BMiddle) (Beside (Above (Rectangle fiveP (size - fiveP - fiveP)) inv AMiddle) (Above (Above (Rectangle (divideRound width 2.0) fiveP) (Rectangle fiveP lhalf) ARight) (Rectangle (width - fiveP) fiveP) ARight) BBottom) ALeft)
+character 'H' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            ninetyP = width - fiveP - fiveP
+                        in  (Beside (Beside (Rectangle fiveP size) (Rectangle ninetyP fiveP) BMiddle) (Rectangle fiveP size) BMiddle)
+character 'I' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            ninetyP = size - fiveP - fiveP
+                        in  (Above (Above (Rectangle width fiveP) (Rectangle fiveP ninetyP) AMiddle) (Rectangle width fiveP) AMiddle)
+
+character 'K' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            bhalf = divideRound size 2.0
+                            uhalf = size - bhalf
+                            bottom = (Beside (Rectangle fiveP bhalf) (Line (width - fiveP) bhalf) BMiddle)
+                            top = (Beside (Rectangle fiveP uhalf) (FlipV (Line (width - fiveP) uhalf)) BMiddle)
+                        in  (Above top bottom AMiddle)
+
+
+character 'L' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                        in  (Above (Rectangle fiveP (size-fiveP)) (Rectangle width fiveP) ALeft)
+character 'N' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                        in  (Beside (Beside (Rectangle fiveP size) (Line (width - fiveP - fiveP) size) BMiddle) (Rectangle fiveP size) BMiddle)
+character 'O' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            inv = Invisible (Rectangle fiveP fiveP)
+                            side = (Above inv (Rectangle fiveP (size - fiveP - fiveP)) AMiddle)
+                            bottom = (Beside (Beside inv (Rectangle (width - fiveP - fiveP) fiveP) BMiddle) inv BMiddle)
+                        in  (Above (Beside (Beside side (Rectangle (width - fiveP - fiveP) fiveP) BTop) side BTop) bottom AMiddle)
+character 'R' size =    let width = divideRound size textWidthConstant
+                            half = divideRound size 2.0
+                            fiveP = max 1 (divideRound size 20.0)
+                            tenP = fiveP + fiveP
+                        in  (Above (Beside (Above (Above (Rectangle (width - fiveP) fiveP) (Rectangle fiveP (half - tenP)) ALeft) (Rectangle (width - fiveP) fiveP) ARight) (Rectangle fiveP (half-tenP)) BMiddle) (Beside (Rectangle fiveP (size-half)) (Line (width-1) (size-half)) BTop) ALeft)
+character 'S' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            inv = Invisible (Rectangle fiveP fiveP)
+                            nfp = width - fiveP
+                            lhalf = divideRound (size - fiveP - fiveP - fiveP) 2.0
+                            uhalf = size - fiveP - fiveP - fiveP - lhalf
+                            middle = (Beside (Beside inv (Rectangle (width - fiveP - fiveP) fiveP) BMiddle) inv BMiddle)
+                            top = (Beside inv (Rectangle nfp fiveP) BMiddle)
+                        in  (Above (Above (Above (Above top (Rectangle fiveP uhalf) ALeft) middle ALeft) (Rectangle fiveP lhalf) ARight) (FlipH top) ARight)
+character 'T' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                        in  (Above (Rectangle width fiveP) (Rectangle fiveP (size-fiveP)) AMiddle)
+character 'U' size =    let width = divideRound size textWidthConstant
+                            fiveP = max 1 (divideRound size 20.0)
+                            twenty = max 1 (divideRound size 5.0)
+                            diag = (Line twenty twenty)
+                            bottom = (Beside (Beside diag (Rectangle (width - twenty - twenty) fiveP) BBottom) (FlipV diag) BBottom)
+                            top = (Beside (Beside (Rectangle fiveP (size - twenty)) (Invisible (Rectangle (width - fiveP - fiveP) (size-twenty))) BMiddle) (Rectangle fiveP (size - twenty)) BMiddle)
+                        in (Above top bottom AMiddle)
+
+           
+                     
 -- Should respect invariant (isEmpty f) == (figureStrings f == [])
 
 figureStrings :: Figure -> [String]
@@ -174,8 +315,18 @@ figureStrings (CenterTriangle n) = if odd n then map (\x -> (makeList (quotNatur
                                             else (map (\x -> (makeList (quotNatural (n-(2*x)) 2) emptyChar)++(makeList (2*x) specialChar)++(makeList (quotNatural (n-(2*x)) 2) emptyChar)) (reverse (iota (quotNatural n 2))))
  -- Circle --
 figureStrings (Circle r) = map (\x -> circleRow r x) (map (\x -> x-1) (reverse (iota ((2*r)+1))))
- -- Line --
-figureStrings (Line x y) = lineRec [] 0 (x+1) (y+1)
+ -- Line -- (NOT DONE!)
+figureStrings (Line x y) =  if x >= y then lineRec [] 0 y (divideRound x (fromIntegral y)) x
+                                      else transpose (figureStrings (Line y x))
+
+
+figureStrings (Text str height) = let nothing = (Rectangle 0 0)
+                                      buffer = (Invisible (Rectangle (max 1 (divideRound height 10.0)) height))
+                                  in  figureStrings(foldl (\x y -> (Beside x (Beside buffer y BMiddle) BMiddle)) nothing (map (\x -> character x height) str))
+
+
+-- Invisible --
+figureStrings (Invisible f) = map (\x -> (makeList (tn (length x)) emptyChar)) (figureStrings f)
  -- FlipV --
 figureStrings (FlipV fig) = reverse (figureStrings fig)
  -- FlipH --
@@ -188,8 +339,15 @@ figureStrings (Above f s pos) = let (firstLst,secondLst) = forceWidth (f,s) pos
                                 in firstLst ++ secondLst
  -- Cut --
 figureStrings (CutH f p) =  let base = figureStrings f
-                                todrop = round (p * (fromIntegral (length base)))
-                            in  drop todrop base
+                                toDrop = round (p * (fromIntegral (length base)))
+                            in  drop toDrop base
+
+
+
+
+
+
+
 
 
 
@@ -209,15 +367,13 @@ dog = Beside (FlipV (RightTriangle 2 2)) (Beside (Beside (Above (Rectangle 13 5)
 heart :: Figure
 heart = Above (Beside (FlipV (CutH (Circle 10) 0.51)) (FlipV (CutH (Circle 10) 0.51)) BMiddle) (FlipV (CenterTriangle 38)) AMiddle
 
+goodLuck :: Figure
+goodLuck = Text "GOOD LUCK!" 15
+
 -- A Sierpinski triangle
 sierpinski :: Natural -> Natural -> Figure
 sierpinski n 1 = CenterTriangle n
 sierpinski n depth = Above (sierpinski n (depth - 1)) (Beside (sierpinski n (depth - 1)) (sierpinski n (depth - 1)) BMiddle) AMiddle
-
-
-
- 
-
 
 
 
