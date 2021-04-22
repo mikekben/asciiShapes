@@ -76,7 +76,7 @@ data Figure =   Rectangle Natural Natural           |
                 FlipH Figure                        |
                 Beside Figure Figure BesidePosition |
                 Above Figure Figure AbovePosition   |
-                CutH Figure Double                  
+                CutH Figure Double
 
 
 
@@ -373,10 +373,8 @@ goodLuck = Text "GOOD LUCK!" 15
 -- A Sierpinski triangle
 sierpinski :: Natural -> Natural -> Figure
 sierpinski n 1 = CenterTriangle n
-sierpinski n depth = Above (sierpinski n (depth - 1)) (Beside (sierpinski n (depth - 1)) (sierpinski n (depth - 1)) BMiddle) AMiddle
-
-
-
+sierpinski n depth = let part = sierpinski n (depth -1)
+                     in Above part (Beside part part BMiddle) AMiddle
 
 
 
