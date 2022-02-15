@@ -76,16 +76,21 @@ data Figure =   Rectangle Natural Natural           |
                 FlipH Figure                        |
                 Beside Figure Figure BesidePosition |
                 Above Figure Figure AbovePosition   |
-                CutH Figure Double
+                CutH Figure Double                  |
+                CutV Figure Double
 
 
 
 makeSquare :: Natural -> Figure
 makeSquare n = Rectangle n n
 
-makeTrapezoid :: Natural -> Natural -> Natural -> Figure
-makeTrapezoid h t b = if (b >= t) then Beside (Beside (FlipH (RightTriangle (divideRound (b-t) 2.0) h)) (Rectangle t h) BMiddle) (RightTriangle (divideRound (b-t) 2.0) h) BMiddle
-                                  else FlipV (makeTrapezoid h b t)
+makeTrapezoidV :: Natural -> Natural -> Natural -> Figure
+makeTrapezoidV h t b = if (b >= t) then Beside (Beside (FlipH (RightTriangle (divideRound (b-t) 2.0) h)) (Rectangle t h) BMiddle) (RightTriangle (divideRound (b-t) 2.0) h) BMiddle
+                                  else FlipV (makeTrapezoidV h b t)
+
+makeTrapezoidH :: Natural -> Natural -> Natural -> Figure
+makeTrapezoidH h t b = if (b >= t) then Above (Above (RightTriangle h (divideRound (b-t) 2.0)) (Rectangle h t) AMiddle) (FlipV (RightTriangle h (divideRound (b-t) 2.0))) AMiddle
+                                  else FlipH (makeTrapezoidH h b t)
 
 makeParallelogram :: Natural -> Natural -> Natural -> Figure
 makeParallelogram h t b = Beside (Beside (FlipH (RightTriangle (divideRound (b-t) 2.0) h)) (Rectangle t h) BMiddle) (FlipV (RightTriangle (divideRound (b-t) 2.0) h)) BMiddle
@@ -103,6 +108,7 @@ isEmpty(FlipH f) = isEmpty f
 isEmpty(Beside f s _) = isEmpty f && isEmpty s
 isEmpty(Above f s _) = isEmpty f && isEmpty s
 isEmpty(CutH f p) = isEmpty f || p == 1
+isEmpty(CutV f p) = isEmpty f || p == 1
 isEmpty(Invisible f) = isEmpty f
 isEmpty(Text str _) = str == ""
 
@@ -120,6 +126,7 @@ fillerRow (FlipH fig) = fillerRow fig
 fillerRow (Beside f s _) = fillerRow f ++ fillerRow s
 fillerRow (Above f s _) = longer (fillerRow f) (fillerRow s)
 fillerRow (CutH f p) = fillerRow f
+fillerRow (CutV f p) = drop (round (p * (fromIntegral (length (fillerRow f))))) (fillerRow f)
 fillerRow (Text str size) = makeList (((tn . length) str) * (divideRound size 2.0)) emptyChar
 
 
@@ -194,7 +201,7 @@ character '!' size =    let width = divideRound size textWidthConstant
                             ten = max 1 (divideRound size 10.0)
                             circSize = 1 + (ten * 2)
                             triSize = divideRound size 2.0
-                            trap = FlipV (makeTrapezoid triSize ten width)
+                            trap = FlipV (makeTrapezoidV triSize ten width)
                             spacer = (Invisible (Rectangle ten (size - triSize - circSize)))
                             circ = Circle ten
                         in  (Above (Above trap spacer AMiddle) circ AMiddle)
@@ -341,6 +348,11 @@ figureStrings (Above f s pos) = let (firstLst,secondLst) = forceWidth (f,s) pos
 figureStrings (CutH f p) =  let base = figureStrings f
                                 toDrop = round (p * (fromIntegral (length base)))
                             in  drop toDrop base
+figureStrings (CutV f p) = let base = figureStrings f
+                               toDrop = round (p * (fromIntegral (length (head base))))
+                               in map (\x -> (drop toDrop x)) base
+
+
 
 
 
@@ -376,6 +388,15 @@ sierpinski n 1 = CenterTriangle n
 sierpinski n depth = let part = sierpinski n (depth -1)
                      in Above part (Beside part part BMiddle) AMiddle
 
+
+vPetal :: Figure
+vPetal = (Above (FlipV (CutH (Circle 7) 0.7)) (makeTrapezoidV 13 14 1) AMiddle)
+
+hPetal :: Figure
+hPetal = (Beside (makeTrapezoidH 13 14 1) (CutV (Circle 7) 0.7) BMiddle)
+
+flower :: Figure
+flower = (Beside (FlipH hPetal) (Beside (Above vPetal (Above (Invisible (Circle 3)) (FlipV vPetal) AMiddle) AMiddle) hPetal BMiddle) BMiddle)
 
 
 draw :: Figure -> IO ()
